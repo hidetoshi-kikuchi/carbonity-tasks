@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carbonity Task Manager</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;--text:#e8ecf4;--text-muted:#7a82a0;--accent:#4f7cff;--accent-dim:rgba(79,124,255,.12);--red:#ff5a5a;--red-bg:rgba(255,90,90,.12);--green:#3ecf8e;--green-bg:rgba(62,207,142,.12);--blue:#4f9eff;--blue-bg:rgba(79,158,255,.12);--yellow:#f5c542;--yellow-bg:rgba(245,197,66,.12);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Inter',sans-serif;font-size:14px;min-height:100vh;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.hdr-r{display:flex;gap:8px;align-items:center;}
+.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:#3d6aee;}.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-secondary{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);}.btn-secondary:hover{color:var(--text);border-color:var(--accent);}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px;}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid transparent;}.btn-danger:hover{border-color:var(--red);}
+.main{padding:20px;max-width:1200px;margin:0 auto;}
+.scan-note{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;margin-bottom:16px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.scan-note strong{color:var(--green);}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .15s;}
+.stat-card:hover{border-color:var(--accent);}.stat-card.active{border-color:var(--accent);background:var(--accent-dim);}
+.stat-label{font-size:11px;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px;}
+.stat-value{font-size:22px;font-weight:700;}
+.stat-value.red{color:var(--red);}.stat-value.green{color:var(--green);}.stat-value.blue{color:var(--blue);}.stat-value.yellow{color:var(--yellow);}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.table-header{padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.table-title{font-size:15px;font-weight:600;}
+.task-count{font-size:12px;color:var(--text-muted);background:var(--surface2);padding:3px 10px;border-radius:20px;}
+.ch-filter-row{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center;}
+.ch-lbl{font-size:11px;color:var(--text-muted);margin-right:4px;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;}
+.ch-pill{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:monospace;background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;}
+.ch-pill.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);}
+.ch-pill:hover:not(.active){color:var(--text);border-color:#555;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--surface2);}
+th{padding:9px 12px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;white-space:nowrap;}
+td{padding:10px 12px;border-top:1px solid var(--border);vertical-align:middle;}
+tr:hover td{background:rgba(255,255,255,.02);}
+.ch-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;font-family:monospace;background:var(--surface2);color:var(--accent);border:1px solid var(--border);white-space:nowrap;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.badge.todo{background:var(--red-bg);color:var(--red);}.badge.todo .badge-dot{background:var(--red);}
+.badge.inprogress{background:var(--green-bg);color:var(--green);}.badge.inprogress .badge-dot{background:var(--green);}
+.badge.done{background:var(--blue-bg);color:var(--blue);}.badge.done .badge-dot{background:var(--blue);}
+.badge.cancelled{background:var(--yellow-bg);color:var(--yellow);}.badge.cancelled .badge-dot{background:var(--yellow);}
+.task-text{font-size:13px;line-height:1.5;max-width:320px;}
+.task-text.strikethrough{text-decoration:line-through;color:var(--text-muted);}
+.assignee{font-size:12px;font-weight:500;}
+.due-date{font-size:12px;color:var(--text-muted);white-space:nowrap;}
+.due-date.overdue{color:var(--red);font-weight:600;}.due-date.soon{color:var(--yellow);}
+.actions{display:flex;gap:5px;align-items:center;}
+select.ss{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;cursor:pointer;outline:none;}
+select.ss:hover{border-color:var(--accent);}
+.state-box{padding:50px 20px;text-align:center;color:var(--text-muted);}
+.state-box .icon{font-size:36px;margin-bottom:10px;}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:11px 18px;border-radius:10px;font-size:13px;z-index:999;transform:translateY(60px);opacity:0;transition:all .3s;pointer-events:none;}
+#toast.show{transform:translateY(0);opacity:1;}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:22px;width:480px;max-width:100%;}
+.modal h3{font-size:15px;margin-bottom:14px;}
+.fg{margin-bottom:12px;}
+.fg label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;}
+.fg input,.fg textarea,.fg select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px;outline:none;font-family:inherit;}
+.fg input:focus,.fg textarea:focus,.fg select:focus{border-color:var(--accent);}
+.fg textarea{resize:vertical;min-height:72px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+.hist-toggle{margin-top:20px;padding:11px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--text-muted);user-select:none;}
+.hist-toggle:hover{color:var(--text);}
+#hist-sec{display:none;margin-top:8px;}
+@media(max-width:640px){
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none;}
+  .task-text{max-width:180px;}
+  .main{padding:12px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-icon">&#9889;</div>Carbonity Tasks</div>
+  <div class="hdr-r">
+    <button class="btn btn-secondary btn-sm" onclick="openAddModal()">&#xFF0B; 追加</button>
+    <button class="btn btn-primary" id="scan-btn" onclick="runScan()">
+      <span id="scan-icon">&#128269;</span><span id="scan-lbl">Slackスキャン</span>
+    </button>
+  </div>
+</header>
+<div class="main">
+  <div class="scan-note" id="scan-note">&#128337; まだスキャンされていません。「Slackスキャン」ボタンで最新タスクを取得してください。</div>
+  <div class="stats-row">
+    <div class="stat-card" onclick="filterByStatus('todo')" id="stat-todo"><div class="stat-label">&#128308; 未着手</div><div class="stat-value red" id="cnt-todo">0</div></div>
+    <div class="stat-card" onclick="filterByStatus('inprogress')" id="stat-inprogress"><div class="stat-label">&#128994; 進行中</div><div class="stat-value green" id="cnt-inprogress">0</div></div>
+    <div class="stat-card" onclick="filterByStatus('done')" id="stat-done"><div class="stat-label">&#128309; 完了</div><div class="stat-value blue" id="cnt-done">0</div></div>
+    <div class="stat-card" onclick="filterByStatus('cancelled')" id="stat-cancelled"><div class="stat-label">&#128992; 中止</div><div class="stat-value yellow" id="cnt-cancelled">0</div></div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title" id="tbl-title">アクティブタスク</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="task-count" id="task-count">0件</span>
+        <button class="btn btn-secondary btn-sm" onclick="filterByStatus(null)">全て</button>
+      </div>
+    </div>
+    <div class="ch-filter-row" id="ch-filter-row"><span class="ch-lbl">絞込:</span><span style="color:var(--text-muted);font-size:12px;">スキャン後に表示</span></div>
+    <table>
+      <thead><tr>
+        <th style="width:35%">タスク内容</th><th style="width:13%">チャンネル</th>
+        <th style="width:11%">担当者</th><th style="width:9%">期限</th>
+        <th style="width:13%">ステータス</th><th>操作</th>
+      </tr></thead>
+      <tbody id="task-tbody"><tr><td colspan="6"><div class="state-box"><div class="icon">&#128269;</div><p>Slackスキャンボタンでタスクを取得</p></div></td></tr></tbody>
+    </table>
+  </div>
+  <div class="hist-toggle" onclick="toggleHist()"><span>&#128230; 完了・中止タスクの履歴</span><span id="hist-chev">&#9660;</span></div>
+  <div id="hist-sec">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:35%">タスク内容</th><th style="width:13%">チャンネル</th>
+          <th style="width:11%">担当者</th><th style="width:9%">期限</th>
+          <th style="width:13%">ステータス</th><th>操作</th>
+        </tr></thead>
+        <tbody id="hist-tbody"><tr><td colspan="6"><div class="state-box"><p>完了・中止タスクはここに表示されます</p></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div class="modal-bg" id="add-modal">
+  <div class="modal">
+    <h3>&#9999;&#65039; タスクを手動追加</h3>
+    <div class="fg"><label>タスク内容 *</label><textarea id="m-text" placeholder="タスクの内容を入力..."></textarea></div>
+    <div class="fg"><label>チャンネル</label><input id="m-ch" type="text" placeholder="例: daclab"></div>
+    <div class="fg"><label>担当者</label><input id="m-assignee" type="text" placeholder="例: 菊池"></div>
+    <div class="fg"><label>完了予定日</label><input id="m-due" type="date"></div>
+    <div class="fg"><label>ステータス</label><select id="m-status"><option value="todo">未着手</option><option value="inprogress">進行中</option></select></div>
+    <div class="fg"><label>Slackリンク（任意）</label><input id="m-link" type="text" placeholder="https://..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="addManualTask()">追加</button>
+    </div>
+  </div>
+</div>
+<script>
+let tasks=[],history=[],filterStatus=null,filterChannel=null,taskId=1;
+const SK='cv5t',HK='cv5h';
+function save(){try{localStorage.setItem(SK,JSON.stringify(tasks));localStorage.setItem(HK,JSON.stringify(history));}catch(e){}}
+function loadLocal(){try{const t=localStorage.getItem(SK),h=localStorage.getItem(HK);if(t)tasks=JSON.parse(t);if(h)history=JSON.parse(h);if(tasks.length||history.length)taskId=Math.max(1,...tasks.map(x=>x.id||0),...history.map(x=>x.id||0))+1;}catch(e){}}
+async function runScan(){
+  const btn=document.getElementById('scan-btn'),icon=document.getElementById('scan-icon'),lbl=document.getElementById('scan-lbl');
+  btn.disabled=true;icon.innerHTML='<span class="spinner"></span>';lbl.textContent='スキャン中…';
+  showLoading();
+  try{
+    const res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    let added=0;
+    for(const item of(data.tasks||[])){
+      if(!tasks.find(t=>t.text.slice(0,20)===(item.text||'').slice(0,20))){
+        tasks.push({id:taskId++,text:item.text||'',channel:item.channel||'',assignee:item.assignee||'',due:item.due||'',link:item.link||'',status:'todo',createdAt:new Date().toISOString()});
+        added++;
+      }
+    }
+    const dt=new Date(data.scannedAt||Date.now());
+    document.getElementById('scan-note').innerHTML=`&#9989; <strong>${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} スキャン済み</strong>&nbsp;— ${data.messageCount||0}件のメッセージから ${added}件のタスクを抽出`;
+    save();render();toast(added>0?added+'件のタスクを追加しました':'新しいタスクは見つかりませんでした');
+  }catch(err){console.error(err);toast('エラー: '+err.message);showEmpty('スキャンに失敗しました');}
+  btn.disabled=false;icon.textContent='🔍';lbl.textContent='Slackスキャン';
+}
+function render(){updateStats();buildPills();renderTable();renderHistory();}
+function updateStats(){
+  document.getElementById('cnt-todo').textContent=tasks.filter(t=>t.status==='todo').length;
+  document.getElementById('cnt-inprogress').textContent=tasks.filter(t=>t.status==='inprogress').length;
+  document.getElementById('cnt-done').textContent=history.filter(t=>t.status==='done').length;
+  document.getElementById('cnt-cancelled').textContent=history.filter(t=>t.status==='cancelled').length;
+  ['todo','inprogress','done','cancelled'].forEach(s=>document.getElementById('stat-'+s).classList.toggle('active',filterStatus===s));
+}
+function buildPills(){
+  const used=[...new Set(tasks.map(t=>t.channel).filter(Boolean))].sort();
+  const row=document.getElementById('ch-filter-row');
+  if(!used.length){row.innerHTML='<span class="ch-lbl">絞込:</span><span style="color:var(--text-muted);font-size:12px;">スキャン後に表示</span>';return;}
+  row.innerHTML='<span class="ch-lbl">絞込:</span>'+`<span class="ch-pill ${!filterChannel?'active':''}" onclick="setChFilter(null)">すべて</span>`+used.map(ch=>`<span class="ch-pill ${filterChannel===ch?'active':''}" onclick="setChFilter('${ch}')">#${ch}</span>`).join('');
+}
+function setChFilter(ch){filterChannel=ch;render();}
+function getFiltered(){let r=tasks;if(filterStatus&&filterStatus!=='done'&&filterStatus!=='cancelled')r=r.filter(t=>t.status===filterStatus);if(filterChannel)r=r.filter(t=>t.channel===filterChannel);return r;}
+function renderTable(){
+  const rows=getFiltered();
+  document.getElementById('task-count').textContent=rows.length+'件';
+  document.getElementById('tbl-title').textContent=filterChannel?'#'+filterChannel:({todo:'未着手タスク',inprogress:'進行中タスク'}[filterStatus]||'アクティブタスク');
+  const tb=document.getElementById('task-tbody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6"><div class="state-box"><div class="icon">&#10003;</div><p>該当タスクなし</p></div></td></tr>';return;}
+  tb.innerHTML=rows.map(t=>taskRow(t,false)).join('');
+}
+function renderHistory(){
+  const tb=document.getElementById('hist-tbody');
+  if(!history.length){tb.innerHTML='<tr><td colspan="6"><div class="state-box"><p>完了・中止タスクはここに表示されます</p></div></td></tr>';return;}
+  tb.innerHTML=history.map(t=>taskRow(t,true)).join('');
+}
+function taskRow(t,isH){
+  const lb={todo:'未着手',inprogress:'進行中',done:'完了',cancelled:'中止'};
+  const dead=t.status==='done'||t.status==='cancelled';
+  const duCls=getDueCls(t.due);
+  const lnk=t.link?`<a href="${t.link}" target="_blank" style="font-size:10px;color:var(--accent);display:block;margin-top:2px;">&#128279; リンク</a>`:'';
+  const opts=['todo','inprogress','done','cancelled'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${lb[s]}</option>`).join('');
+  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}">${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions">${!isH?`<select class="ss" onchange="changeStatus(${t.id},this.value)">${opts}</select>`:''} ${isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:''}</div></td></tr>`;
+}
+function changeStatus(id,s){const i=tasks.findIndex(t=>t.id===id);if(i===-1)return;tasks[i].status=s;if(s==='done'||s==='cancelled'){history.unshift(tasks[i]);tasks.splice(i,1);}save();render();toast({done:'完了',cancelled:'中止',todo:'未着手',inprogress:'進行中'}[s]+'に変更しました');}
+function deleteTask(id,isH){if(isH)history=history.filter(t=>t.id!==id);else tasks=tasks.filter(t=>t.id!==id);save();render();toast('タスクを削除しました');}
+function filterByStatus(s){filterStatus=filterStatus===s?null:s;render();}
+function openAddModal(){['m-text','m-ch','m-assignee','m-link'].forEach(i=>document.getElementById(i).value='');document.getElementById('m-due').value='';document.getElementById('m-status').value='todo';document.getElementById('add-modal').classList.add('open');}
+function closeModal(){document.getElementById('add-modal').classList.remove('open');}
+function addManualTask(){const text=document.getElementById('m-text').value.trim();if(!text){toast('タスク内容を入力してください');return;}tasks.push({id:taskId++,text,channel:document.getElementById('m-ch').value.trim()||'manual',assignee:document.getElementById('m-assignee').value.trim(),due:document.getElementById('m-due').value,link:document.getElementById('m-link').value.trim(),status:document.getElementById('m-status').value,createdAt:new Date().toISOString()});save();render();closeModal();toast('タスクを追加しました');}
+function fmtDue(d){if(!d)return'—';const dt=new Date(d);return(dt.getMonth()+1)+'/'+dt.getDate();}
+function getDueCls(d){if(!d)return'';const diff=(new Date(d)-new Date())/864e5;return diff<0?'overdue':diff<=3?'soon':'';}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(msg){const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3200);}
+function showLoading(){document.getElementById('task-tbody').innerHTML='<tr><td colspan="6"><div class="state-box"><div class="spinner" style="margin:0 auto 10px"></div><p>Slackをスキャン中…</p></div></td></tr>';}
+function showEmpty(m){document.getElementById('task-tbody').innerHTML=`<tr><td colspan="6"><div class="state-box"><p>${m}</p></div></td></tr>`;}
+function toggleHist(){const s=document.getElementById('hist-sec'),c=document.getElementById('hist-chev');s.style.display=s.style.display==='block'?'none':'block';c.textContent=s.style.display==='block'?'▲':'▼';}
+loadLocal();render();
+</script>
+</body>
+</html>

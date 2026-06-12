@@ -1,0 +1,12 @@
+{
+  "name": "carbonity-tasks",
+  "version": "1.0.0",
+  "description": "Carbonity Task Manager - Slack連携タスク管理ツール",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
