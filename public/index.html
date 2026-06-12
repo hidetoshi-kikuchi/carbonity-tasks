@@ -1,4 +1,4 @@
-<!-- v7 -->
+<!-- v8 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -81,29 +81,54 @@ select.ss:hover{border-color:var(--accent);}
   .main{padding:12px;}
   table thead{display:none;}
   table tr{display:block;border:1px solid var(--border);border-radius:10px;margin:8px 0;padding:10px 12px;background:var(--surface2);}
-  table td{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border:none;font-size:12px;}
+  /* 全tdをブロック表示 */
+  table td{display:block;padding:3px 0;border:none;font-size:12px;}
   /* タスク内容 */
-  table td:first-child{font-weight:500;font-size:13px;display:block;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:4px;}
-  /* チャンネル・担当者・期限 */
-  table td:nth-child(2)::before{content:"チャンネル: ";font-size:11px;color:var(--text-muted);}
-  table td:nth-child(3)::before{content:"担当者: ";font-size:11px;color:var(--text-muted);}
-  table td:nth-child(4)::before{content:"期限: ";font-size:11px;color:var(--text-muted);}
-  /* ステータスバッジ列は非表示（操作列に統合） */
-  table td:nth-child(5){display:none;}
-  /* 操作列：ステータスバッジ＋プルダウン＋削除を1行に */
+  table td:nth-child(1){font-weight:500;font-size:13px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+  /* チャンネル・担当者・期限・ステータス を横並び2列で表示 */
+  table td:nth-child(2),table td:nth-child(3),table td:nth-child(4),table td:nth-child(5){
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  table td:nth-child(2)::before{content:"チャンネル";font-size:11px;color:var(--text-muted);}
+  table td:nth-child(3)::before{content:"担当者";font-size:11px;color:var(--text-muted);}
+  table td:nth-child(4)::before{content:"期限";font-size:11px;color:var(--text-muted);}
+  table td:nth-child(5)::before{content:"ステータス";font-size:11px;color:var(--text-muted);}
+  /* 操作列を確実に表示 */
   table td:nth-child(6){
     display:flex !important;
-    padding-top:8px;
-    margin-top:4px;
+    visibility:visible !important;
+    opacity:1 !important;
+    padding-top:10px !important;
+    margin-top:6px;
     border-top:1px solid var(--border);
-    justify-content:space-between;
+    justify-content:flex-end;
     align-items:center;
-    gap:6px;
+    gap:8px;
     width:100%;
+    min-height:40px;
   }
-  .actions{display:flex !important;gap:6px;align-items:center;width:100%;}
-  .actions select.ss{flex:1;font-size:12px;padding:5px 6px;max-width:130px;}
-  .actions .btn-danger{font-size:12px !important;padding:5px 10px !important;flex-shrink:0;}
+  table td:nth-child(6) .actions{
+    display:flex !important;
+    gap:8px;
+    width:100%;
+    justify-content:flex-end;
+    align-items:center;
+  }
+  table td:nth-child(6) select.ss{
+    flex:1;
+    font-size:13px;
+    padding:6px 8px;
+    min-width:100px;
+  }
+  table td:nth-child(6) .btn-danger{
+    display:inline-flex !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    font-size:13px !important;
+    padding:6px 16px !important;
+    flex-shrink:0;
+    min-width:60px;
+  }
   .task-text{max-width:100%;}
   tr:hover td{background:transparent;}
 }
