@@ -256,7 +256,7 @@ function taskRow(t,isH){
   const duCls=getDueCls(t.due);
   const lnk=t.link?`<a href="${t.link}" target="_blank" style="font-size:10px;color:var(--accent);display:block;margin-top:2px;">&#128279; リンク</a>`:'';
   const opts=['todo','inprogress','done','cancelled'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${lb[s]}</option>`).join('');
-  const delBtn=isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:'';
+  const delBtn=`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},${isH})">削除</button>`;
   const clickable=dead?'':`onclick="openEditModal(${t.id},${isH})"`;return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${isH})">${opts}</select> ${delBtn}</div></td></tr>`;
 }
 
