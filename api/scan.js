@@ -4,20 +4,35 @@
 const REDIS_URL   = process.env.KV_REST_API_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN;
 
-// ── Redis helpers ──
+// ── Upstash Redis REST helpers ──
 async function redisGet(key) {
-  const res = await fetch(`${REDIS_URL}/get/${key}`, {
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
-  });
-  const data = await res.json();
-  return data.result ? JSON.parse(data.result) : null;
+  try {
+    const res = await fetch(`${REDIS_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
+    });
+    const data = await res.json();
+    if (!data.result) return null;
+    // Upstashはresultが文字列で返るのでパース
+    const val = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+    return Array.isArray(val) ? val : null;
+  } catch(e) {
+    console.error('redisGet error:', e);
+    return null;
+  }
 }
-async function redisSet(key, value) {
-  await fetch(`${REDIS_URL}/set/${key}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(value)
-  });
+
+async function redisSet(key, arr) {
+  try {
+    // Upstash REST API: SET key value
+    const value = JSON.stringify(arr);
+    const res = await fetch(`${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
+    });
+    return await res.json();
+  } catch(e) {
+    console.error('redisSet error:', e);
+  }
 }
 
 export default async function handler(req, res) {
@@ -40,12 +55,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── POST /api/scan?action=save: ステータス保存 ──
-  if (req.method === 'POST' && req.query.action === 'save') {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // ── POST ?action=save: ステータス保存 ──
+  if (req.query && req.query.action === 'save') {
     try {
-      const { tasks, history } = req.body;
-      await redisSet('carbonity:tasks',   JSON.stringify(tasks   || []));
-      await redisSet('carbonity:history', JSON.stringify(history || []));
+      const { tasks, history } = req.body || {};
+      await redisSet('carbonity:tasks',   tasks   || []);
+      await redisSet('carbonity:history', history || []);
       return res.status(200).json({ ok: true });
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -53,11 +70,12 @@ export default async function handler(req, res) {
   }
 
   // ── POST /api/scan: Slackスキャン ──
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!ANTHROPIC_API_KEY || !SLACK_TOKEN) return res.status(500).json({ error: '環境変数が未設定です' });
+  if (!ANTHROPIC_API_KEY || !SLACK_TOKEN) {
+    return res.status(500).json({ error: '環境変数 ANTHROPIC_API_KEY または SLACK_TOKEN が未設定です' });
+  }
 
   try {
-    // Slack検索
+    // Slack検索（直近30日）
     const since = new Date();
     since.setDate(since.getDate() - 30);
     const afterDate = since.toISOString().split('T')[0];
@@ -67,7 +85,7 @@ export default async function handler(req, res) {
       { headers: { Authorization: `Bearer ${SLACK_TOKEN}` } }
     );
     const slackData = await slackRes.json();
-    if (!slackData.ok) return res.status(500).json({ error: `Slack: ${slackData.error}` });
+    if (!slackData.ok) return res.status(500).json({ error: `Slack APIエラー: ${slackData.error}` });
 
     const messages = (slackData.messages?.matches || []).map(m => ({
       channel:   m.channel?.name || '',
@@ -76,19 +94,25 @@ export default async function handler(req, res) {
       permalink: m.permalink || ''
     }));
 
-    if (!messages.length) return res.status(200).json({ tasks: [], scannedAt: new Date().toISOString(), messageCount: 0 });
+    if (!messages.length) {
+      return res.status(200).json({ tasks: [], scannedAt: new Date().toISOString(), messageCount: 0, added: 0 });
+    }
 
-    // Claude抽出
+    // Claudeでタスク抽出
     const msgDump = messages.map(m => `[#${m.channel}] ${m.user}: ${m.text}`).join('\n');
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2000,
-        system: `Slackメッセージからタスク・依頼・宿題・アクションアイテムを抽出し、JSON配列のみ返してください（説明不要）:
-[{"text":"内容(60文字以内)","channel":"チャンネル名","assignee":"担当者(不明は空)","due":"YYYY-MM-DD(なければ空)","link":"URLまたは空"}]
-なければ[]`,
+        system: `Slackメッセージからタスク・依頼・宿題・アクションアイテムを全て抽出し、JSON配列のみ返してください（説明不要）:
+[{"text":"内容(60文字以内)","channel":"チャンネル名(#なし)","assignee":"担当者(不明は空文字)","due":"YYYY-MM-DD(なければ空文字)","link":"SlackURLまたは空文字"}]
+タスクなし→[]`,
         messages: [{ role: 'user', content: `今日は${new Date().toLocaleDateString('ja-JP')}。\n\n${msgDump}` }]
       })
     });
@@ -97,22 +121,37 @@ export default async function handler(req, res) {
     const match = rawText.match(/\[[\s\S]*\]/);
     const newTasks = match ? JSON.parse(match[0]) : [];
 
-    // 既存データとマージして保存
-    const existing = await redisGet('carbonity:tasks') || [];
+    // 既存データを取得してマージ
+    const existing = (await redisGet('carbonity:tasks')) || [];
     let added = 0;
     for (const item of newTasks) {
-      if (!existing.find(t => t.text.slice(0, 20) === (item.text || '').slice(0, 20))) {
+      const isDup = existing.some(t => (t.text||'').slice(0,20) === (item.text||'').slice(0,20));
+      if (!isDup) {
         const maxId = existing.length ? Math.max(...existing.map(t => t.id || 0)) : 0;
-        existing.push({ id: maxId + 1, ...item, status: 'todo', createdAt: new Date().toISOString() });
+        existing.push({
+          id: maxId + 1,
+          text: item.text || '',
+          channel: item.channel || '',
+          assignee: item.assignee || '',
+          due: item.due || '',
+          link: item.link || '',
+          status: 'todo',
+          createdAt: new Date().toISOString()
+        });
         added++;
       }
     }
-    await redisSet('carbonity:tasks', JSON.stringify(existing));
+    await redisSet('carbonity:tasks', existing);
 
-    return res.status(200).json({ tasks: newTasks, scannedAt: new Date().toISOString(), messageCount: messages.length, added });
+    return res.status(200).json({
+      tasks: newTasks,
+      scannedAt: new Date().toISOString(),
+      messageCount: messages.length,
+      added
+    });
 
   } catch (err) {
-    console.error(err);
+    console.error('scan error:', err);
     return res.status(500).json({ error: err.message });
   }
 }
