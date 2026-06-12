@@ -80,28 +80,29 @@ select.ss:hover{border-color:var(--accent);}
   .main{padding:12px;}
   table thead{display:none;}
   table tr{display:block;border:1px solid var(--border);border-radius:10px;margin:8px 0;padding:10px 12px;background:var(--surface2);}
-  table td{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border:none;font-size:13px;}
+  table td{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border:none;font-size:12px;}
   /* タスク内容 */
-  table td:first-child{font-weight:500;font-size:13px;display:block;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+  table td:first-child{font-weight:500;font-size:13px;display:block;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:4px;}
   /* チャンネル・担当者・期限 */
   table td:nth-child(2)::before{content:"チャンネル: ";font-size:11px;color:var(--text-muted);}
   table td:nth-child(3)::before{content:"担当者: ";font-size:11px;color:var(--text-muted);}
   table td:nth-child(4)::before{content:"期限: ";font-size:11px;color:var(--text-muted);}
-  /* ステータスバッジ列は非表示（プルダウンで代替） */
+  /* ステータスバッジ列は非表示（操作列に統合） */
   table td:nth-child(5){display:none;}
-  /* 操作列 */
+  /* 操作列：ステータスバッジ＋プルダウン＋削除を1行に */
   table td:nth-child(6){
     display:flex !important;
-    padding-top:10px;
+    padding-top:8px;
     margin-top:4px;
     border-top:1px solid var(--border);
-    justify-content:flex-end;
-    gap:8px;
+    justify-content:space-between;
+    align-items:center;
+    gap:6px;
     width:100%;
   }
-  .actions{display:flex !important;gap:8px;width:100%;justify-content:flex-end;align-items:center;}
-  .actions select.ss{flex:1;font-size:13px;padding:7px 8px;}
-  .actions .btn-danger{font-size:13px !important;padding:7px 14px !important;flex-shrink:0;}
+  .actions{display:flex !important;gap:6px;align-items:center;width:100%;}
+  .actions select.ss{flex:1;font-size:12px;padding:5px 6px;max-width:130px;}
+  .actions .btn-danger{font-size:12px !important;padding:5px 10px !important;flex-shrink:0;}
   .task-text{max-width:100%;}
   tr:hover td{background:transparent;}
 }
@@ -282,7 +283,9 @@ function taskRow(t,isH){
   const opts=['todo','inprogress','done','cancelled'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${lb[s]}</option>`).join('');
   const iH=isH?1:0;
   const delBtn=`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},${iH})">削除</button>`;
-  const clickable=dead?'':`onclick="openEditModal(${t.id},${iH})"`;return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${iH})">${opts}</select> ${delBtn}</div></td></tr>`;
+  const clickable=dead?'':`onclick="openEditModal(${t.id},${iH})"`;
+  const statusBadge=`<span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span>`;
+  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions">${statusBadge}<select class="ss" onchange="changeStatus(${t.id},this.value,${iH})">${opts}</select> ${delBtn}</div></td></tr>`;
 }
 
 function changeStatus(id,s,fromHistory){
