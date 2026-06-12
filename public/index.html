@@ -1,4 +1,4 @@
-<!-- v9 -->
+<!-- v10 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -240,6 +240,12 @@ async function serverLoad(){
     if(tasks.length||history.length){
       taskId=Math.max(1,...tasks.map(x=>x.id||0),...history.map(x=>x.id||0))+1;
     }
+    // 前回スキャン日時をnoteに表示
+    if(data.lastScanAt){
+      const dt=new Date(data.lastScanAt);
+      document.getElementById('scan-note').innerHTML=
+        `&#9989; <strong>前回スキャン: ${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</strong>&nbsp;— 次回スキャンはこの日時以降の新着メッセージのみ対象になります。`;
+    }
     return true;
   }catch(e){return false;}
 }
@@ -257,7 +263,8 @@ async function runScan(){
     // サーバーが保存済みなので再取得
     await serverLoad();
     const dt=new Date(data.scannedAt||Date.now());
-    document.getElementById('scan-note').innerHTML=`&#9989; <strong>${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} スキャン済み</strong>&nbsp;— ${data.messageCount||0}件のメッセージから ${data.added||0}件のタスクを抽出`;
+    const sinceStr=data.since?` (${data.since}以降)`:'';
+    document.getElementById('scan-note').innerHTML=`&#9989; <strong>${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} スキャン済み</strong>&nbsp;— ${data.messageCount||0}件のメッセージ${sinceStr}から ${data.added||0}件のタスクを抽出`;
     render();
     toast(data.added>0?data.added+'件のタスクを追加しました':'新しいタスクは見つかりませんでした');
   }catch(err){console.error(err);toast('エラー: '+err.message);showEmpty('スキャンに失敗しました');}
