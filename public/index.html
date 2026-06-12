@@ -93,7 +93,7 @@ select.ss:hover{border-color:var(--accent);}
   </div>
 </header>
 <div class="main">
-  <div class="scan-note" id="scan-note">&#128337; まだスキャンされていません。「Slackスキャン」ボタンで最新タスクを取得してください。</div>
+  <div class="scan-note" id="scan-note">&#128337; 読み込み中...</div>
   <div class="stats-row">
     <div class="stat-card" onclick="filterByStatus('todo')" id="stat-todo"><div class="stat-label">&#128308; 未着手</div><div class="stat-value red" id="cnt-todo">0</div></div>
     <div class="stat-card" onclick="filterByStatus('inprogress')" id="stat-inprogress"><div class="stat-label">&#128994; 進行中</div><div class="stat-value green" id="cnt-inprogress">0</div></div>
@@ -108,14 +108,14 @@ select.ss:hover{border-color:var(--accent);}
         <button class="btn btn-secondary btn-sm" onclick="filterByStatus(null)">全て</button>
       </div>
     </div>
-    <div class="ch-filter-row" id="ch-filter-row"><span class="ch-lbl">絞込:</span><span style="color:var(--text-muted);font-size:12px;">スキャン後に表示</span></div>
+    <div class="ch-filter-row" id="ch-filter-row"><span class="ch-lbl">絞込:</span><span style="color:var(--text-muted);font-size:12px;">読み込み中...</span></div>
     <table>
       <thead><tr>
         <th style="width:35%">タスク内容</th><th style="width:13%">チャンネル</th>
         <th style="width:11%">担当者</th><th style="width:9%">期限</th>
         <th style="width:13%">ステータス</th><th>操作</th>
       </tr></thead>
-      <tbody id="task-tbody"><tr><td colspan="6"><div class="state-box"><div class="icon">&#128269;</div><p>Slackスキャンボタンでタスクを取得</p></div></td></tr></tbody>
+      <tbody id="task-tbody"><tr><td colspan="6"><div class="state-box"><div class="spinner" style="margin:0 auto 10px"></div><p>データを読み込み中...</p></div></td></tr></tbody>
     </table>
   </div>
   <div class="hist-toggle" onclick="toggleHist()"><span>&#128230; 完了・中止タスクの履歴</span><span id="hist-chev">&#9660;</span></div>
@@ -150,9 +150,34 @@ select.ss:hover{border-color:var(--accent);}
 </div>
 <script>
 let tasks=[],history=[],filterStatus=null,filterChannel=null,taskId=1;
-const SK='cv5t',HK='cv5h';
-function save(){try{localStorage.setItem(SK,JSON.stringify(tasks));localStorage.setItem(HK,JSON.stringify(history));}catch(e){}}
-function loadLocal(){try{const t=localStorage.getItem(SK),h=localStorage.getItem(HK);if(t)tasks=JSON.parse(t);if(h)history=JSON.parse(h);if(tasks.length||history.length)taskId=Math.max(1,...tasks.map(x=>x.id||0),...history.map(x=>x.id||0))+1;}catch(e){}}
+
+// ── サーバー側（Redis）にデータを保存 ──
+async function serverSave(){
+  try{
+    await fetch('/api/scan?action=save',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tasks,history})
+    });
+  }catch(e){console.warn('save error',e);}
+}
+
+// ── サーバーからデータを読み込み ──
+async function serverLoad(){
+  try{
+    const res=await fetch('/api/scan');
+    if(!res.ok) return false;
+    const data=await res.json();
+    tasks=data.tasks||[];
+    history=data.history||[];
+    if(tasks.length||history.length){
+      taskId=Math.max(1,...tasks.map(x=>x.id||0),...history.map(x=>x.id||0))+1;
+    }
+    return true;
+  }catch(e){return false;}
+}
+
+// ── Slackスキャン ──
 async function runScan(){
   const btn=document.getElementById('scan-btn'),icon=document.getElementById('scan-icon'),lbl=document.getElementById('scan-lbl');
   btn.disabled=true;icon.innerHTML='<span class="spinner"></span>';lbl.textContent='スキャン中…';
@@ -162,20 +187,18 @@ async function runScan(){
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(data.error)throw new Error(data.error);
-    let added=0;
-    for(const item of(data.tasks||[])){
-      if(!tasks.find(t=>t.text.slice(0,20)===(item.text||'').slice(0,20))){
-        tasks.push({id:taskId++,text:item.text||'',channel:item.channel||'',assignee:item.assignee||'',due:item.due||'',link:item.link||'',status:'todo',createdAt:new Date().toISOString()});
-        added++;
-      }
-    }
+    // サーバーが保存済みなので再取得
+    await serverLoad();
     const dt=new Date(data.scannedAt||Date.now());
-    document.getElementById('scan-note').innerHTML=`&#9989; <strong>${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} スキャン済み</strong>&nbsp;— ${data.messageCount||0}件のメッセージから ${added}件のタスクを抽出`;
-    save();render();toast(added>0?added+'件のタスクを追加しました':'新しいタスクは見つかりませんでした');
+    document.getElementById('scan-note').innerHTML=`&#9989; <strong>${dt.toLocaleDateString('ja-JP')} ${dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})} スキャン済み</strong>&nbsp;— ${data.messageCount||0}件のメッセージから ${data.added||0}件のタスクを抽出`;
+    render();
+    toast(data.added>0?data.added+'件のタスクを追加しました':'新しいタスクは見つかりませんでした');
   }catch(err){console.error(err);toast('エラー: '+err.message);showEmpty('スキャンに失敗しました');}
   btn.disabled=false;icon.textContent='🔍';lbl.textContent='Slackスキャン';
 }
+
 function render(){updateStats();buildPills();renderTable();renderHistory();}
+
 function updateStats(){
   document.getElementById('cnt-todo').textContent=tasks.filter(t=>t.status==='todo').length;
   document.getElementById('cnt-inprogress').textContent=tasks.filter(t=>t.status==='inprogress').length;
@@ -183,6 +206,7 @@ function updateStats(){
   document.getElementById('cnt-cancelled').textContent=history.filter(t=>t.status==='cancelled').length;
   ['todo','inprogress','done','cancelled'].forEach(s=>document.getElementById('stat-'+s).classList.toggle('active',filterStatus===s));
 }
+
 function buildPills(){
   const used=[...new Set(tasks.map(t=>t.channel).filter(Boolean))].sort();
   const row=document.getElementById('ch-filter-row');
@@ -190,7 +214,13 @@ function buildPills(){
   row.innerHTML='<span class="ch-lbl">絞込:</span>'+`<span class="ch-pill ${!filterChannel?'active':''}" onclick="setChFilter(null)">すべて</span>`+used.map(ch=>`<span class="ch-pill ${filterChannel===ch?'active':''}" onclick="setChFilter('${ch}')">#${ch}</span>`).join('');
 }
 function setChFilter(ch){filterChannel=ch;render();}
-function getFiltered(){let r=tasks;if(filterStatus&&filterStatus!=='done'&&filterStatus!=='cancelled')r=r.filter(t=>t.status===filterStatus);if(filterChannel)r=r.filter(t=>t.channel===filterChannel);return r;}
+
+function getFiltered(){
+  let r=tasks;
+  if(filterStatus&&filterStatus!=='done'&&filterStatus!=='cancelled')r=r.filter(t=>t.status===filterStatus);
+  if(filterChannel)r=r.filter(t=>t.channel===filterChannel);
+  return r;
+}
 function renderTable(){
   const rows=getFiltered();
   document.getElementById('task-count').textContent=rows.length+'件';
@@ -213,26 +243,37 @@ function taskRow(t,isH){
   const delBtn=isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:'';
   return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}">${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${isH})">${opts}</select> ${delBtn}</div></td></tr>`;
 }
+
 function changeStatus(id,s,fromHistory){
   const lb={done:'完了',cancelled:'中止',todo:'未着手',inprogress:'進行中'};
   if(fromHistory){
-    const i=history.findIndex(t=>t.id===id); if(i===-1)return;
+    const i=history.findIndex(t=>t.id===id);if(i===-1)return;
     history[i].status=s;
     if(s==='todo'||s==='inprogress'){tasks.push(history[i]);history.splice(i,1);toast(lb[s]+'に戻しました ↩');}
     else toast(lb[s]+'に変更しました');
   }else{
-    const i=tasks.findIndex(t=>t.id===id); if(i===-1)return;
+    const i=tasks.findIndex(t=>t.id===id);if(i===-1)return;
     tasks[i].status=s;
     if(s==='done'||s==='cancelled'){history.unshift(tasks[i]);tasks.splice(i,1);}
     toast(lb[s]+'に変更しました');
   }
-  save();render();
+  serverSave();render();
 }
-function deleteTask(id,isH){if(isH)history=history.filter(t=>t.id!==id);else tasks=tasks.filter(t=>t.id!==id);save();render();toast('タスクを削除しました');}
+function deleteTask(id,isH){
+  if(isH)history=history.filter(t=>t.id!==id);else tasks=tasks.filter(t=>t.id!==id);
+  serverSave();render();toast('タスクを削除しました');
+}
 function filterByStatus(s){filterStatus=filterStatus===s?null:s;render();}
+
 function openAddModal(){['m-text','m-ch','m-assignee','m-link'].forEach(i=>document.getElementById(i).value='');document.getElementById('m-due').value='';document.getElementById('m-status').value='todo';document.getElementById('add-modal').classList.add('open');}
 function closeModal(){document.getElementById('add-modal').classList.remove('open');}
-function addManualTask(){const text=document.getElementById('m-text').value.trim();if(!text){toast('タスク内容を入力してください');return;}tasks.push({id:taskId++,text,channel:document.getElementById('m-ch').value.trim()||'manual',assignee:document.getElementById('m-assignee').value.trim(),due:document.getElementById('m-due').value,link:document.getElementById('m-link').value.trim(),status:document.getElementById('m-status').value,createdAt:new Date().toISOString()});save();render();closeModal();toast('タスクを追加しました');}
+function addManualTask(){
+  const text=document.getElementById('m-text').value.trim();
+  if(!text){toast('タスク内容を入力してください');return;}
+  tasks.push({id:taskId++,text,channel:document.getElementById('m-ch').value.trim()||'manual',assignee:document.getElementById('m-assignee').value.trim(),due:document.getElementById('m-due').value,link:document.getElementById('m-link').value.trim(),status:document.getElementById('m-status').value,createdAt:new Date().toISOString()});
+  serverSave();render();closeModal();toast('タスクを追加しました');
+}
+
 function fmtDue(d){if(!d)return'—';const dt=new Date(d);return(dt.getMonth()+1)+'/'+dt.getDate();}
 function getDueCls(d){if(!d)return'';const diff=(new Date(d)-new Date())/864e5;return diff<0?'overdue':diff<=3?'soon':'';}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -240,7 +281,18 @@ function toast(msg){const e=document.getElementById('toast');e.textContent=msg;e
 function showLoading(){document.getElementById('task-tbody').innerHTML='<tr><td colspan="6"><div class="state-box"><div class="spinner" style="margin:0 auto 10px"></div><p>Slackをスキャン中…</p></div></td></tr>';}
 function showEmpty(m){document.getElementById('task-tbody').innerHTML=`<tr><td colspan="6"><div class="state-box"><p>${m}</p></div></td></tr>`;}
 function toggleHist(){const s=document.getElementById('hist-sec'),c=document.getElementById('hist-chev');s.style.display=s.style.display==='block'?'none':'block';c.textContent=s.style.display==='block'?'▲':'▼';}
-loadLocal();render();
+
+// ── 初期化：サーバーからデータ読み込み ──
+(async()=>{
+  const ok=await serverLoad();
+  if(ok){
+    const note=document.getElementById('scan-note');
+    note.innerHTML=tasks.length||history.length
+      ?'&#128230; 前回のデータを読み込みました。「Slackスキャン」で最新状態に更新できます。'
+      :'&#128337; まだスキャンされていません。「Slackスキャン」ボタンで最新タスクを取得してください。';
+  }
+  render();
+})();
 </script>
 </body>
 </html>
