@@ -47,8 +47,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .badge.inprogress{background:var(--green-bg);color:var(--green);}.badge.inprogress .badge-dot{background:var(--green);}
 .badge.done{background:var(--blue-bg);color:var(--blue);}.badge.done .badge-dot{background:var(--blue);}
 .badge.cancelled{background:var(--yellow-bg);color:var(--yellow);}.badge.cancelled .badge-dot{background:var(--yellow);}
-.task-text{font-size:13px;line-height:1.5;max-width:320px;}
-.task-text.strikethrough{text-decoration:line-through;color:var(--text-muted);}
+.task-text{font-size:13px;line-height:1.5;max-width:320px;cursor:pointer;}
+.task-text:hover:not(.strikethrough){color:var(--accent);text-decoration:underline;text-decoration-style:dotted;}
+.task-text.strikethrough{text-decoration:line-through;color:var(--text-muted);cursor:default;}
 .assignee{font-size:12px;font-weight:500;}
 .due-date{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 .due-date.overdue{color:var(--red);font-weight:600;}.due-date.soon{color:var(--yellow);}
@@ -148,6 +149,21 @@ select.ss:hover{border-color:var(--accent);}
     </div>
   </div>
 </div>
+
+<div class="modal-bg" id="edit-modal">
+  <div class="modal">
+    <h3>&#9999;&#65039; タスクを編集</h3>
+    <div class="fg"><label>タスク内容 *</label><textarea id="e-text" placeholder="タスクの内容を入力..."></textarea></div>
+    <div class="fg"><label>チャンネル</label><input id="e-ch" type="text"></div>
+    <div class="fg"><label>担当者</label><input id="e-assignee" type="text"></div>
+    <div class="fg"><label>完了予定日</label><input id="e-due" type="date"></div>
+    <div class="fg"><label>Slackリンク（任意）</label><input id="e-link" type="text"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEditModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
 <script>
 let tasks=[],history=[],filterStatus=null,filterChannel=null,taskId=1;
 
@@ -241,7 +257,7 @@ function taskRow(t,isH){
   const lnk=t.link?`<a href="${t.link}" target="_blank" style="font-size:10px;color:var(--accent);display:block;margin-top:2px;">&#128279; リンク</a>`:'';
   const opts=['todo','inprogress','done','cancelled'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${lb[s]}</option>`).join('');
   const delBtn=isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:'';
-  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}">${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${isH})">${opts}</select> ${delBtn}</div></td></tr>`;
+  const clickable=dead?'':`onclick="openEditModal(${t.id},${isH})"`;return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${isH})">${opts}</select> ${delBtn}</div></td></tr>`;
 }
 
 function changeStatus(id,s,fromHistory){
@@ -267,6 +283,32 @@ function filterByStatus(s){filterStatus=filterStatus===s?null:s;render();}
 
 function openAddModal(){['m-text','m-ch','m-assignee','m-link'].forEach(i=>document.getElementById(i).value='');document.getElementById('m-due').value='';document.getElementById('m-status').value='todo';document.getElementById('add-modal').classList.add('open');}
 function closeModal(){document.getElementById('add-modal').classList.remove('open');}
+let editId=null,editIsH=false;
+function openEditModal(id,isH){
+  const arr=isH?history:tasks;
+  const t=arr.find(x=>x.id===id); if(!t)return;
+  editId=id; editIsH=isH;
+  document.getElementById('e-text').value=t.text||'';
+  document.getElementById('e-ch').value=t.channel||'';
+  document.getElementById('e-assignee').value=t.assignee||'';
+  document.getElementById('e-due').value=t.due||'';
+  document.getElementById('e-link').value=t.link||'';
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeEditModal(){document.getElementById('edit-modal').classList.remove('open');}
+function saveEdit(){
+  const text=document.getElementById('e-text').value.trim();
+  if(!text){toast('タスク内容を入力してください');return;}
+  const arr=editIsH?history:tasks;
+  const i=arr.findIndex(t=>t.id===editId); if(i===-1)return;
+  arr[i].text=text;
+  arr[i].channel=document.getElementById('e-ch').value.trim()||arr[i].channel;
+  arr[i].assignee=document.getElementById('e-assignee').value.trim();
+  arr[i].due=document.getElementById('e-due').value;
+  arr[i].link=document.getElementById('e-link').value.trim();
+  serverSave();render();closeEditModal();toast('タスクを更新しました ✅');
+}
+
 function addManualTask(){
   const text=document.getElementById('m-text').value.trim();
   if(!text){toast('タスク内容を入力してください');return;}
