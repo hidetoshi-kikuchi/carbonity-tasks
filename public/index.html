@@ -82,15 +82,28 @@ select.ss:hover{border-color:var(--accent);}
   table thead{display:none;}
   table tr{display:block;border:1px solid var(--border);border-radius:10px;margin:8px 12px;padding:10px 12px;background:var(--surface2);}
   table td{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border:none;font-size:13px;}
+  /* タスク内容（1列目）*/
   table td:first-child{font-weight:500;font-size:13px;display:block;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+  /* ラベル */
   table td:nth-child(2)::before{content:"チャンネル";font-size:11px;color:var(--text-muted);}
   table td:nth-child(3)::before{content:"担当者";font-size:11px;color:var(--text-muted);}
   table td:nth-child(4)::before{content:"期限";font-size:11px;color:var(--text-muted);}
   table td:nth-child(5)::before{content:"ステータス";font-size:11px;color:var(--text-muted);}
-  table td:last-child{display:flex;gap:6px;justify-content:flex-end;align-items:center;padding-top:8px;border-top:1px solid var(--border);margin-top:6px;flex-wrap:wrap;}
+  /* 操作列（最終列）: 必ず表示・折り返し可 */
+  table td:last-child{
+    display:flex !important;
+    gap:6px;
+    justify-content:flex-end;
+    align-items:center;
+    padding-top:10px;
+    margin-top:6px;
+    border-top:1px solid var(--border);
+    flex-wrap:wrap;
+    width:100%;
+  }
   .actions{display:flex;gap:6px;width:100%;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
-  .actions select.ss{flex:1;min-width:80px;font-size:12px;}
-  .actions .btn-danger{font-size:11px;padding:4px 8px;white-space:nowrap;}
+  .actions select.ss{flex:1;min-width:90px;max-width:160px;font-size:12px;}
+  .btn-danger{font-size:12px !important;padding:6px 12px !important;flex-shrink:0;}
   .task-text{max-width:100%;}
   tr:hover td{background:transparent;}
 }
