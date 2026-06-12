@@ -1,8 +1,8 @@
 // api/scan.js - Vercel Serverless Function
 // Slackスキャン + Claude抽出 + Upstash Redis でデータ永続化
 
-const REDIS_URL   = process.env.STORAGE_URL   || process.env.KV_REST_API_URL  || process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.STORAGE_TOKEN || process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_URL   = process.env.KV_REST_API_URL;
+const REDIS_TOKEN = process.env.KV_REST_API_TOKEN;
 
 // ── Redis helpers ──
 async function redisGet(key) {
