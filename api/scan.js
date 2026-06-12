@@ -12,9 +12,8 @@ async function redisGet(key) {
     });
     const data = await res.json();
     if (!data.result) return null;
-    // Upstashはresultが文字列で返るのでパース
     const val = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
-    return Array.isArray(val) ? val : null;
+    return val;
   } catch(e) {
     console.error('redisGet error:', e);
     return null;
@@ -22,17 +21,11 @@ async function redisGet(key) {
 }
 
 async function redisSet(key, arr) {
-  try {
-    // Upstash REST API: SET key value
-    const value = JSON.stringify(arr);
-    const res = await fetch(`${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
-    });
-    return await res.json();
-  } catch(e) {
-    console.error('redisSet error:', e);
-  }
+  const value = JSON.stringify(arr);
+  await fetch(`${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}` }
+  });
 }
 
 export default async function handler(req, res) {
@@ -47,9 +40,10 @@ export default async function handler(req, res) {
   // ── GET: データ取得 ──
   if (req.method === 'GET') {
     try {
-      const tasks   = await redisGet('carbonity:tasks')   || [];
-      const history = await redisGet('carbonity:history') || [];
-      return res.status(200).json({ tasks, history });
+      const tasks      = (await redisGet('carbonity:tasks'))   || [];
+      const history    = (await redisGet('carbonity:history')) || [];
+      const lastScanAt = (await redisGet('carbonity:lastScanAt')) || null;
+      return res.status(200).json({ tasks, history, lastScanAt });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -75,11 +69,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Slack検索（直近30日）
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
+    // 前回スキャン日時を取得（なければ7日前）
+    const lastScanAt = await redisGet('carbonity:lastScanAt');
+    const since = lastScanAt
+      ? new Date(lastScanAt)
+      : (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d; })();
     const afterDate = since.toISOString().split('T')[0];
 
+    console.log(`Scanning from: ${afterDate} (lastScanAt: ${lastScanAt || 'none'})`);
+
+    // Slack検索
     const slackRes = await fetch(
       `https://slack.com/api/search.messages?query=after:${afterDate}&count=100&sort=timestamp&sort_dir=desc`,
       { headers: { Authorization: `Bearer ${SLACK_TOKEN}` } }
@@ -94,8 +93,15 @@ export default async function handler(req, res) {
       permalink: m.permalink || ''
     }));
 
+    // スキャン日時を今すぐ保存（次回はここから）
+    const nowIso = new Date().toISOString();
+    await redisSet('carbonity:lastScanAt', nowIso);
+
     if (!messages.length) {
-      return res.status(200).json({ tasks: [], scannedAt: new Date().toISOString(), messageCount: 0, added: 0 });
+      return res.status(200).json({
+        tasks: [], scannedAt: nowIso, messageCount: 0, added: 0,
+        since: afterDate
+      });
     }
 
     // Claudeでタスク抽出
@@ -121,7 +127,7 @@ export default async function handler(req, res) {
     const match = rawText.match(/\[[\s\S]*\]/);
     const newTasks = match ? JSON.parse(match[0]) : [];
 
-    // 既存データを取得してマージ
+    // 既存データとマージ（テキストの先頭20文字で重複チェック）
     const existing = (await redisGet('carbonity:tasks')) || [];
     let added = 0;
     for (const item of newTasks) {
@@ -136,7 +142,7 @@ export default async function handler(req, res) {
           due: item.due || '',
           link: item.link || '',
           status: 'todo',
-          createdAt: new Date().toISOString()
+          createdAt: nowIso
         });
         added++;
       }
@@ -145,9 +151,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       tasks: newTasks,
-      scannedAt: new Date().toISOString(),
+      scannedAt: nowIso,
       messageCount: messages.length,
-      added
+      added,
+      since: afterDate
     });
 
   } catch (err) {
