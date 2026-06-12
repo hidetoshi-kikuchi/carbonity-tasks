@@ -210,9 +210,24 @@ function taskRow(t,isH){
   const duCls=getDueCls(t.due);
   const lnk=t.link?`<a href="${t.link}" target="_blank" style="font-size:10px;color:var(--accent);display:block;margin-top:2px;">&#128279; リンク</a>`:'';
   const opts=['todo','inprogress','done','cancelled'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${lb[s]}</option>`).join('');
-  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}">${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions">${!isH?`<select class="ss" onchange="changeStatus(${t.id},this.value)">${opts}</select>`:''} ${isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:''}</div></td></tr>`;
+  const delBtn=isH?`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},true)">削除</button>`:'';
+  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}">${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${isH})">${opts}</select> ${delBtn}</div></td></tr>`;
 }
-function changeStatus(id,s){const i=tasks.findIndex(t=>t.id===id);if(i===-1)return;tasks[i].status=s;if(s==='done'||s==='cancelled'){history.unshift(tasks[i]);tasks.splice(i,1);}save();render();toast({done:'完了',cancelled:'中止',todo:'未着手',inprogress:'進行中'}[s]+'に変更しました');}
+function changeStatus(id,s,fromHistory){
+  const lb={done:'完了',cancelled:'中止',todo:'未着手',inprogress:'進行中'};
+  if(fromHistory){
+    const i=history.findIndex(t=>t.id===id); if(i===-1)return;
+    history[i].status=s;
+    if(s==='todo'||s==='inprogress'){tasks.push(history[i]);history.splice(i,1);toast(lb[s]+'に戻しました ↩');}
+    else toast(lb[s]+'に変更しました');
+  }else{
+    const i=tasks.findIndex(t=>t.id===id); if(i===-1)return;
+    tasks[i].status=s;
+    if(s==='done'||s==='cancelled'){history.unshift(tasks[i]);tasks.splice(i,1);}
+    toast(lb[s]+'に変更しました');
+  }
+  save();render();
+}
 function deleteTask(id,isH){if(isH)history=history.filter(t=>t.id!==id);else tasks=tasks.filter(t=>t.id!==id);save();render();toast('タスクを削除しました');}
 function filterByStatus(s){filterStatus=filterStatus===s?null:s;render();}
 function openAddModal(){['m-text','m-ch','m-assignee','m-link'].forEach(i=>document.getElementById(i).value='');document.getElementById('m-due').value='';document.getElementById('m-status').value='todo';document.getElementById('add-modal').classList.add('open');}
