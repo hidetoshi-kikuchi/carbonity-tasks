@@ -1,4 +1,4 @@
-<!-- v6 -->
+<!-- v7 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -54,7 +54,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .assignee{font-size:12px;font-weight:500;}
 .due-date{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 .due-date.overdue{color:var(--red);font-weight:600;}.due-date.soon{color:var(--yellow);}
-.actions{display:flex;gap:5px;align-items:center;}
+.actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;}
 select.ss{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;cursor:pointer;outline:none;}
 select.ss:hover{border-color:var(--accent);}
 .state-box{padding:50px 20px;text-align:center;color:var(--text-muted);}
@@ -140,7 +140,7 @@ select.ss:hover{border-color:var(--accent);}
       <thead><tr>
         <th style="width:35%">タスク内容</th><th style="width:13%">チャンネル</th>
         <th style="width:11%">担当者</th><th style="width:9%">期限</th>
-        <th style="width:13%">ステータス</th><th>操作</th>
+        <th style="width:13%">ステータス</th><th style="min-width:160px">操作</th>
       </tr></thead>
       <tbody id="task-tbody"><tr><td colspan="6"><div class="state-box"><div class="spinner" style="margin:0 auto 10px"></div><p>データを読み込み中...</p></div></td></tr></tbody>
     </table>
@@ -152,7 +152,7 @@ select.ss:hover{border-color:var(--accent);}
         <thead><tr>
           <th style="width:35%">タスク内容</th><th style="width:13%">チャンネル</th>
           <th style="width:11%">担当者</th><th style="width:9%">期限</th>
-          <th style="width:13%">ステータス</th><th>操作</th>
+          <th style="width:13%">ステータス</th><th style="min-width:160px">操作</th>
         </tr></thead>
         <tbody id="hist-tbody"><tr><td colspan="6"><div class="state-box"><p>完了・中止タスクはここに表示されます</p></div></td></tr></tbody>
       </table>
@@ -285,8 +285,7 @@ function taskRow(t,isH){
   const iH=isH?1:0;
   const delBtn=`<button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id},${iH})">削除</button>`;
   const clickable=dead?'':`onclick="openEditModal(${t.id},${iH})"`;
-  const statusBadge=`<span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span>`;
-  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions">${statusBadge}<select class="ss" onchange="changeStatus(${t.id},this.value,${iH})">${opts}</select> ${delBtn}</div></td></tr>`;
+  return `<tr id="row-${t.id}"><td><div class="task-text ${dead?'strikethrough':''}" ${clickable}>${esc(t.text)}</div>${lnk}</td><td><span class="ch-badge">#${esc(t.channel||'')}</span></td><td><span class="assignee">${esc(t.assignee||'—')}</span></td><td><span class="due-date ${duCls}">${fmtDue(t.due)}</span></td><td><span class="badge ${t.status}"><span class="badge-dot"></span>${lb[t.status]}</span></td><td><div class="actions"><select class="ss" onchange="changeStatus(${t.id},this.value,${iH})">${opts}</select>${delBtn}</div></td></tr>`;
 }
 
 function changeStatus(id,s,fromHistory){
